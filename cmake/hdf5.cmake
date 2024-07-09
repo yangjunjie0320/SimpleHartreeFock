@@ -19,3 +19,4 @@ ExternalProject_Add(hdf5
 ExternalProject_Get_Property(hdf5 INSTALL_DIR)
 include_directories(${HDF5_INSTALL_DIR}/include)
 link_directories(${HDF5_INSTALL_DIR}/lib)
+link_libraries(hdf5 hdf5_cpp)

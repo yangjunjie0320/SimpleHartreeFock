@@ -1,8 +1,26 @@
 import os
-import numpy
+import numpy, scipy.linalg
+
 import pyscf
 from pyscf import gto
 from pyscf import scf, fci
+from pyscf.lib import chkfile
+
+def get_cderi(eri):
+    nao = eri.shape[0]
+    assert eri.shape == (nao, nao, nao, nao)
+
+    e, v = scipy.linalg.eigh(eri.reshape(nao ** 2, nao ** 2))
+    m = e > 1e-10
+    sqrt_e = numpy.sqrt(e[m])
+
+    cderi = numpy.einsum("Q,xQ->Qx", sqrt_e, v[:, m])
+    cderi = cderi.reshape(-1, nao, nao)
+
+    err = abs(numpy.einsum("Qx,Qy->xy", cderi, cderi) - eri).max()
+    assert err < 1e-10
+
+    return cderi
 
 def gen_data(inp, dm_rhf):
     inp = inp.split('-')
@@ -79,7 +97,7 @@ def gen_data(inp, dm_rhf):
 
         raise RuntimeError("Invalid input.")
     
-    rhf_obj = pyscf.scf.RHF(mol)
+    rhf_obj = pyscf.scf.RHF(mol).density_fit()
     rhf_obj.max_cycle = 200
     rhf_obj.conv_tol  = 1e-10
     rhf_obj.kernel(dm_rhf)
@@ -133,12 +151,24 @@ def gen_data(inp, dm_rhf):
     ovlp   = mol.intor('int1e_ovlp')
     eri    = mol.intor('int2e')
 
-    from pyscf.lib import chkfile
+    nao = ovlp.shape[0]
+    e, v = scipy.linalg.eigh(eri.reshape(nao ** 2, nao ** 2))
+    m = e > 1e-10
+    em = e[m]
+    vm = v[:, m]
+    cderi = numpy.einsum("Q,xQ->Qx", numpy.sqrt(em), vm).reshape(-1, nao, nao)
+
+    chkfile.dump(f"{filename}/data.h5", "atm", mol._atm)
+    chkfile.dump(f"{filename}/data.h5", "bas", mol._bas)
+    chkfile.dump(f"{filename}/data.h5", "env", mol._env)
+
     chkfile.dump(f"{filename}/data.h5", "ovlp",    ovlp)
     chkfile.dump(f"{filename}/data.h5", "hcore",   hcore)
     chkfile.dump(f"{filename}/data.h5", "eri",     eri)
+    chkfile.dump(f"{filename}/data.h5", "cderi",   cderi)
     chkfile.dump(f"{filename}/data.h5", "nelecs",  nelecs)
     chkfile.dump(f"{filename}/data.h5", "e_nuc",   e_nuc)
+
     chkfile.dump(f"{filename}/data.h5", "ene_rhf", ene_rhf)
     chkfile.dump(f"{filename}/data.h5", "ene_uhf", ene_uhf)
     chkfile.dump(f"{filename}/data.h5", "ene_fci", ene_fci)
