@@ -1,6 +1,8 @@
 #include <iostream>
 #include <cassert>
 #include <armadillo>
+#include <string>
+#include <cstdio>
 
 class MoleculeInformation {
 public:
@@ -14,7 +16,7 @@ public:
     arma::mat  h1e;
     arma::cube cderi;
 
-    MoleculeInformation() = default;
+    // arma::imat
     MoleculeInformation(std::string filename) {
         arma::ivec nelec; nelec.load(arma::hdf5_name(filename, "nelec"));
         nelec_alph = nelec(0);
@@ -28,9 +30,9 @@ public:
         naux = cderi.n_slices;
 
         arma::vec ene_tmp; 
-        ene_tmp.load(arma::hdf5_name(filename, "ene_nuc"));     ene_nuc = ene_tmp(0);
-        ene_tmp.load(arma::hdf5_name(filename, "ene_rhf_ref")); ene_rhf_ref = ene_tmp(0);
-        ene_tmp.load(arma::hdf5_name(filename, "ene_uhf_ref")); ene_uhf_ref = ene_tmp(0);
+        ene_tmp.load(arma::hdf5_name(filename, "ene_nuc")); ene_nuc = ene_tmp(0);
+        ene_tmp.load(arma::hdf5_name(filename, "ene_rhf")); ene_rhf_ref = ene_tmp(0);
+        ene_tmp.load(arma::hdf5_name(filename, "ene_uhf")); ene_uhf_ref = ene_tmp(0);
     }
 };
 
@@ -51,20 +53,24 @@ void eigh(const arma::mat& h, const arma::mat& s, arma::mat& c, arma::vec& e) {
 arma::mat get_vjk(const MoleculeInformation& mol_obj, const arma::mat& rdm1) {
     auto nao  = mol_obj.nao;
     auto naux = mol_obj.naux;
+    arma::mat* cderi = & mol_obj.cderi;
 
     arma::mat vj = arma::zeros(nao, nao);
     arma::mat vk = arma::zeros(nao, nao);
-
-    for (auto mu = 0; mu < nao; mu++) {
+    
+    for (auto mu = 0; mu < nao; mu++) { 
         for (auto nu = 0; nu < nao; nu++) {
-            for (auto lm = 0; lm < nao; lm++) {
-                for (auto sg = 0; sg < nao; sg++) {
-                    for (auto x = 0; x < naux; x++) {
-                        vj(mu, nu) += mol_obj.cderi(mu, nu, x) * mol_obj.cderi(lm, sg, x) * rdm1(lm, sg);
-                        vk(mu, nu) += mol_obj.cderi(mu, sg, x) * mol_obj.cderi(lm, nu, x) * rdm1(lm, sg);
-                    }
-                }
-            }
+            double vj_mu_nu = 0.0, vk_mu_nu = 0.0;
+              for (auto lm = 0; lm < nao; lm++) { 
+                  for (auto sg = 0; sg < nao; sg++) {
+                      for (auto x = 0; x < naux; x++) {
+                          vj_mu_nu += (& cderi)(mu, nu, x) * (& cderi)(lm, sg, x) * rdm1(lm, sg);
+                          vk_mu_nu += (& cderi)(mu, sg, x) * (& cderi)(lm, nu, x) * rdm1(lm, sg);
+                        }
+                  }
+              }
+            vj(mu, nu) = vj_mu_nu;
+            vk(mu, nu) = vk_mu_nu;
         }
     }
 
@@ -98,6 +104,13 @@ int hartree_fock(MoleculeInformation mol_obj) {
 
     int iter = 0, max_iter = 100;
 
+    std::cout << std::string(44, '-') << std::endl;
+    std::cout << std::setw(4) << "Iter"
+              << std::setw(20) << "Total Energy"
+              << std::setw(20) << "Energy Change"
+              << std::endl;
+    std::cout << std::string(44, '-') << std::endl;
+
     while (not is_converged and not is_max_iter) {
         arma::mat rdm1 = c_occ * c_occ.t();
         arma::mat fock = h1e + get_vjk(mol_obj, rdm1);
@@ -107,19 +120,26 @@ int hartree_fock(MoleculeInformation mol_obj) {
         eigh(fock, s1e, c, e);
         c_occ = c.cols(0, nocc - 1);
 
-        if (std::abs(e_cur - e_pre) < 1e-6) {
-            is_converged = true;
-        }
+        double ene_tot = e_cur + mol_obj.ene_nuc;
+        double de = (iter > 0) ? std::abs(e_cur - e_pre) : 1.0;
+        is_converged = (de < 1e-6 and iter > 0);
+        is_max_iter  = (iter > max_iter);
 
-        if (iter > max_iter) {
-            is_max_iter = true;
+        // format output
+        if (iter > 0) {
+            // Output the iteration number with padding
+            std::cout << std::setw(4) << iter << " "
+                      // Output the energy sum with fixed-point notation and precise format
+                      << std::setw(19) << std::right << std::fixed << std::setprecision(8) << ene_tot
+                      // Output the energy change with scientific notation and precise format
+                      << std::setw(20) << std::right << std::scientific << std::setprecision(4) << de
+                      << std::endl;
         }
 
         e_pre = e_cur; iter++;
-
-        std::cout << "Iter: " << iter << " Energy: " << e_cur << std::endl;
     }
-
+    std::cout << std::string(44, '-') << std::endl;
+    return 0;  
 }
 
 int main(int argc, char** argv) {
