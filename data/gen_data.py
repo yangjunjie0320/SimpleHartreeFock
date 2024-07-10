@@ -166,12 +166,14 @@ def gen_data(inp, dm_rhf):
     chkfile.dump(f"{filename}/data.h5", "hcore",   hcore)
     chkfile.dump(f"{filename}/data.h5", "eri",     eri)
     chkfile.dump(f"{filename}/data.h5", "cderi",   cderi)
-    chkfile.dump(f"{filename}/data.h5", "nelecs",  nelecs)
-    chkfile.dump(f"{filename}/data.h5", "e_nuc",   e_nuc)
 
-    chkfile.dump(f"{filename}/data.h5", "ene_rhf", ene_rhf)
-    chkfile.dump(f"{filename}/data.h5", "ene_uhf", ene_uhf)
-    chkfile.dump(f"{filename}/data.h5", "ene_fci", ene_fci)
+    chkfile.dump(f"{filename}/data.h5", "nelec",  numpy.array([nelecs]))
+    chkfile.dump(f"{filename}/data.h5", "nelec_alph", nelecs[0])
+    chkfile.dump(f"{filename}/data.h5", "nelec_beta", nelecs[1])
+    chkfile.dump(f"{filename}/data.h5", "e_nuc",   numpy.array([  e_nuc]))
+    chkfile.dump(f"{filename}/data.h5", "ene_rhf", numpy.array([ene_rhf]))
+    chkfile.dump(f"{filename}/data.h5", "ene_uhf", numpy.array([ene_uhf]))
+    chkfile.dump(f"{filename}/data.h5", "ene_fci", numpy.array([ene_fci]))
 
     print(f"Generated data for {inp[0]:8s} at {bl: 6.4f}: ref RHF energy = {rhf_obj.e_tot: 16.10f}, ref UHF energy = {uhf_obj.e_tot: 16.10f}, ref FCI energy = {ene_fci: 16.10f}")
 
