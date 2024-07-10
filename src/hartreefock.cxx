@@ -8,6 +8,8 @@ public:
     int nelec_beta;
     int nao, naux;
 
+    double ene_nuc, ene_rhf_ref, ene_uhf_ref;
+
     arma::mat  s1e;
     arma::mat  h1e;
     arma::cube cderi;
@@ -24,6 +26,11 @@ public:
 
         nao = s1e.n_rows;
         naux = cderi.n_slices;
+
+        arma::vec ene_tmp; 
+        ene_tmp.load(arma::hdf5_name(filename, "ene_nuc"));     ene_nuc = ene_tmp(0);
+        ene_tmp.load(arma::hdf5_name(filename, "ene_rhf_ref")); ene_rhf_ref = ene_tmp(0);
+        ene_tmp.load(arma::hdf5_name(filename, "ene_uhf_ref")); ene_uhf_ref = ene_tmp(0);
     }
 };
 
