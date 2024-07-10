@@ -51,27 +51,29 @@ void eigh(const arma::mat& h, const arma::mat& s, arma::mat& c, arma::vec& e) {
 
 
 arma::mat get_vjk(const MoleculeInformation& mol_obj, const arma::mat& rdm1) {
-    auto nao  = mol_obj.nao;
+    auto nao = mol_obj.nao;
     auto naux = mol_obj.naux;
-    arma::mat* cderi = & mol_obj.cderi;
+    const arma::cube& cderi = mol_obj.cderi;
 
     arma::mat vj = arma::zeros(nao, nao);
     arma::mat vk = arma::zeros(nao, nao);
-    
-    for (auto mu = 0; mu < nao; mu++) { 
-        for (auto nu = 0; nu < nao; nu++) {
-            double vj_mu_nu = 0.0, vk_mu_nu = 0.0;
-              for (auto lm = 0; lm < nao; lm++) { 
-                  for (auto sg = 0; sg < nao; sg++) {
-                      for (auto x = 0; x < naux; x++) {
-                          vj_mu_nu += (& cderi)(mu, nu, x) * (& cderi)(lm, sg, x) * rdm1(lm, sg);
-                          vk_mu_nu += (& cderi)(mu, sg, x) * (& cderi)(lm, nu, x) * rdm1(lm, sg);
-                        }
-                  }
-              }
-            vj(mu, nu) = vj_mu_nu;
-            vk(mu, nu) = vk_mu_nu;
+
+    for (int x = 0; x < naux; x++) {
+        arma::mat vjx = arma::zeros(nao, nao);
+        arma::mat vkx = arma::zeros(nao, nao);
+
+        for (int mu = 0; mu < nao; mu++) {
+            for (int nu = 0; nu < nao; nu++) {
+                for (int lm = 0; lm < nao; lm++) {
+                    for (int sg = 0; sg < nao; sg++) {
+                        vjx(mu, nu) += cderi(mu, nu, x) * cderi(lm, sg, x) * rdm1(sg, lm);
+                        vkx(mu, nu) += cderi(mu, lm, x) * cderi(nu, sg, x) * rdm1(sg, lm);
+                    }
+                }
+            }
         }
+
+        vj += vjx; vk += vkx;
     }
 
     return 2 * vj - vk;
