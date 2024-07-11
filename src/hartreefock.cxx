@@ -59,21 +59,16 @@ arma::mat get_vjk(const MoleculeInformation& mol_obj, const arma::mat& rdm1) {
     arma::mat vk = arma::zeros(nao, nao);
 
     for (int x = 0; x < naux; x++) {
-        arma::mat vjx = arma::zeros(nao, nao);
-        arma::mat vkx = arma::zeros(nao, nao);
-
         for (int mu = 0; mu < nao; mu++) {
             for (int nu = 0; nu < nao; nu++) {
                 for (int lm = 0; lm < nao; lm++) {
                     for (int sg = 0; sg < nao; sg++) {
-                        vjx(mu, nu) += cderi(mu, nu, x) * cderi(lm, sg, x) * rdm1(sg, lm);
-                        vkx(mu, nu) += cderi(mu, lm, x) * cderi(nu, sg, x) * rdm1(sg, lm);
+                        vj(mu, nu) += cderi(mu, nu, x) * cderi(lm, sg, x) * rdm1(sg, lm);
+                        vk(mu, nu) += cderi(mu, lm, x) * cderi(nu, sg, x) * rdm1(sg, lm);
                     }
                 }
             }
         }
-
-        vj += vjx; vk += vkx;
     }
 
     return 2 * vj - vk;
@@ -103,6 +98,7 @@ int hartree_fock(MoleculeInformation mol_obj) {
 
     bool is_converged = false;
     bool is_max_iter = false;
+    double e_tot = 0.0, de = 1.0, conv_tol = 1e-8;
 
     int iter = 0, max_iter = 100;
 
@@ -117,14 +113,19 @@ int hartree_fock(MoleculeInformation mol_obj) {
         arma::mat rdm1 = c_occ * c_occ.t();
         arma::mat fock = h1e + get_vjk(mol_obj, rdm1);
 
-        e_cur = arma::accu(rdm1 % (h1e + fock));
+        e_cur = 0.0;
+        for (auto mu = 0; mu < nao; mu++) {
+            for (auto nu = 0; nu < nao; nu++) {
+                e_cur += rdm1(mu, nu) * (h1e(mu, nu) + fock(mu, nu));
+            }
+        }
 
         eigh(fock, s1e, c, e);
         c_occ = c.cols(0, nocc - 1);
 
-        double ene_tot = e_cur + mol_obj.ene_nuc;
-        double de = (iter > 0) ? std::abs(e_cur - e_pre) : 1.0;
-        is_converged = (de < 1e-6 and iter > 0);
+        e_tot = e_cur + mol_obj.ene_nuc;
+        de = (iter > 0) ? std::abs(e_cur - e_pre) : 1.0;
+        is_converged = (de < conv_tol and iter > 0);
         is_max_iter  = (iter > max_iter);
 
         // format output
@@ -132,7 +133,7 @@ int hartree_fock(MoleculeInformation mol_obj) {
             // Output the iteration number with padding
             std::cout << std::setw(4) << iter << " "
                       // Output the energy sum with fixed-point notation and precise format
-                      << std::setw(19) << std::right << std::fixed << std::setprecision(8) << ene_tot
+                      << std::setw(19) << std::right << std::fixed << std::setprecision(8) << e_tot
                       // Output the energy change with scientific notation and precise format
                       << std::setw(20) << std::right << std::scientific << std::setprecision(4) << de
                       << std::endl;
@@ -141,6 +142,11 @@ int hartree_fock(MoleculeInformation mol_obj) {
         e_pre = e_cur; iter++;
     }
     std::cout << std::string(44, '-') << std::endl;
+
+    assert(is_converged);
+    std::cout << "Total energy     :" << std::setw(20) << std::right << std::fixed << std::setprecision(8) << e_tot << std::endl;
+    std::cout << "Reference energy :" << std::setw(20) << std::right << std::fixed << std::setprecision(8) << mol_obj.ene_rhf_ref << std::endl;
+    assert(std::abs(e_tot - mol_obj.ene_rhf_ref) < 1e-6);
     return 0;  
 }
 
