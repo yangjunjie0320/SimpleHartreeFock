@@ -97,7 +97,7 @@ def gen_data(inp, dm_rhf):
 
         raise RuntimeError("Invalid input.")
     
-    rhf_obj = pyscf.scf.RHF(mol).density_fit()
+    rhf_obj = pyscf.scf.RHF(mol)
     rhf_obj.max_cycle = 200
     rhf_obj.conv_tol  = 1e-10
     rhf_obj.kernel(dm_rhf)
@@ -157,6 +157,7 @@ def gen_data(inp, dm_rhf):
     em = e[m]
     vm = v[:, m]
     cderi = numpy.einsum("Q,xQ->Qx", numpy.sqrt(em), vm).reshape(-1, nao, nao)
+    assert abs(numpy.einsum("Qmn,Qkl->mnkl", cderi, cderi) - eri).max() < 1e-8
 
     chkfile.dump(f"{filename}/data.h5", "atm", mol._atm)
     chkfile.dump(f"{filename}/data.h5", "bas", mol._bas)
@@ -165,6 +166,7 @@ def gen_data(inp, dm_rhf):
     chkfile.dump(f"{filename}/data.h5", "ovlp",    ovlp)
     chkfile.dump(f"{filename}/data.h5", "hcore",   hcore)
     chkfile.dump(f"{filename}/data.h5", "cderi",   cderi)
+    chkfile.dump(f"{filename}/data.h5", "eri",     eri)
 
     chkfile.dump(f"{filename}/data.h5", "nelec",  numpy.array([nelecs]))
     chkfile.dump(f"{filename}/data.h5", "ene_nuc", numpy.array([[ene_nuc]]))
@@ -182,4 +184,3 @@ if __name__ == "__main__":
         for bl in numpy.linspace(0.5, 3.0, 61):
             inp = f"{mol}-{bl:.4f}"
             dm_rhf = gen_data(inp, dm_rhf)
-
