@@ -8,6 +8,5 @@ class ContractedGaussianTypeOrbital {
 }
 
 class PrimitiveGaussianTypeOrbital {
-
+    
 }
-
