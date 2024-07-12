@@ -10,4 +10,5 @@ include(ExternalProject)
 include(cmake/armadillo.cmake)
 
 # add the executable
-add_executable(hf.x ${PROJECT_SOURCE_DIR}/src/hartreefock.cxx)
+add_executable(hf.x ${PROJECT_SOURCE_DIR}/src/mol.cxx ${PROJECT_SOURCE_DIR}/src/rhf.cxx)
+target_include_directories(hf.x PRIVATE ${PROJECT_SOURCE_DIR}/include)
