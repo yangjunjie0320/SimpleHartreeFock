@@ -63,8 +63,8 @@ arma::mat get_vjk(const MoleculeInformation& mol_obj, const arma::mat& rdm1) {
             for (int nu = 0; nu < nao; nu++) {
                 for (int lm = 0; lm < nao; lm++) {
                     for (int sg = 0; sg < nao; sg++) {
-                        vj(mu, nu) += cderi(mu, nu, x) * cderi(lm, sg, x) * rdm1(sg, lm);
-                        vk(mu, nu) += cderi(mu, lm, x) * cderi(nu, sg, x) * rdm1(sg, lm);
+                        vj(mu, nu) += cderi(mu, nu, x) * cderi(lm, sg, x) * rdm1(lm, sg);
+                        vk(mu, nu) += cderi(mu, lm, x) * cderi(nu, sg, x) * rdm1(lm, sg);
                     }
                 }
             }
