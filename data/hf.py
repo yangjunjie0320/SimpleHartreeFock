@@ -3,6 +3,29 @@ import numpy, scipy, h5py
 # Use eigh to diagonalize matrices
 from scipy.linalg import eigh
 
+class PrimitiveGaussianTypeOrbital(object):
+    center : numpy.ndarray
+    exponent : float
+    coefficient : float
+    angular_momentum : numpy.ndarray
+
+class ContractedGaussianTypeOrbital(object):
+    primitives : list
+    coefficient : float
+
+class BasisSet(object):
+    contracted_gto : list
+
+def get_ovlp_integral(h5file : str = None, method : str = "read") -> numpy.ndarray:
+    if method == "read":
+        with h5py.File(h5file, "r") as f:
+            ovlp = f["ovlp"][()]
+        return ovlp
+    elif method == "compute":
+        raise NotImplementedError("This function is not implemented yet.")
+    else:
+        raise ValueError(f"Unknown method {method}.")
+
 def solve_rhf(h5file : str = None, max_iter :int = 100, tol: float = 1e-8) -> float:
     # Load the data
     with h5py.File(h5file, "r") as f:
