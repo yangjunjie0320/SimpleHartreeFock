@@ -40,26 +40,79 @@ arma::mat get_coul(const MoleculeInformation& mol_obj, const arma::mat& rdm1) {
     return vj;
 }
 
-arma::mat get_exch(const MoleculeInformation& mol_obj, const arma::mat& rdm1) {
+template <Problem P
+arma::mat get_exch(const P& prob, const arma::mat& rdm1, arma::mat& exch){
     auto nao = mol_obj.nao;
     auto naux = mol_obj.naux;
     const arma::cube& cderi = mol_obj.cderi;
     arma::mat vk = arma::zeros(nao, nao);
 
+    auto nao2 = nao * nao;
+
+    #pragma omp parallel for
+    for (auto munu: range(nao2)) {
+        auto mu = munu / nao;
+        auto nu = munu % nao;
+        
+        double vk_mu_nu = 0.0;
+        for (auto x: range(naux)) {
+            for (auto lmsg: range(nao2)) {
+                auto lm = lmsg / nao;
+                auto sg = lmsg % nao;
+                vk_mu_nu += cderi(mu, nu, x) * cderi(lm, sg, x) * rdm1(lm, sg);
+            }
+        }
+        vk(mu, nu) = vk_mu_nu;
+    }
+
     for (int x = 0; x < naux; x++) {
-        for (int mu = 0; mu < nao; mu++) {
-            for (int nu = 0; nu < nao; nu++) {
-                for (int lm = 0; lm < nao; lm++) {
-                    for (int sg = 0; sg < nao; sg++) {
-                        vk(mu, nu) += cderi(mu, lm, x) * cderi(nu, sg, x) * rdm1(lm, sg);
-                    }
+        #pragma omp parallel for
+        for (auto munu: range(nao2)) {
+            auto mu = munu / nao;
+            auto nu = munu % nao;
+            for (int lm = 0; lm < nao; lm++) {
+                for (int sg = 0; sg < nao; sg++) {
+                    vk(mu, nu) += cderi(mu, nu, x) * cderi(lm, sg, x) * rdm1(lm, sg);
                 }
             }
         }
-    }
 
     return vk;
 }
+
+template<typename T> class ProblemBase {
+public:
+    using value_type = T;
+    arma::mat hcore;
+    arma::mat ovlap;
+    arma::mat
+};
+
+class RestrictedHartreeFockProblem {
+public:
+    arma::mat h1e;
+    arma::mat s1e;
+    arma::mat cderi;
+    arma::mat rdm1;
+    arma::mat fock;
+    arma::mat coeff_mo;
+    arma::vec energ_mo;
+    
+}
+
+class ResultBase {
+public:
+    double ene_tot;
+}
+
+// restricted hartree-fock result
+class RestrictedHartreeFockResult : public ResultBase {
+public:
+    arma::mat coeff_mo; // MO coefficients
+    arma::vec energ_mo; // MO energies
+
+    RestrictedHartreeFockResult(double ene_tot, arma::mat c, arma::vec e) : ResultBase(ene_tot), coeff_mo(c), energ_mo(e) {}
+};
 
 double solve_rhf(MoleculeInformation mol_obj, int max_iter = 100, double conv_tol = 1e-8) {
     auto s1e = mol_obj.get_ovlp();
@@ -129,7 +182,9 @@ double solve_rhf(MoleculeInformation mol_obj, int max_iter = 100, double conv_to
 }
 
 int main(int argc, char** argv) {
+    concept Problem = RestrictedHartreeFockProblem;
+
     std::string filename = "/Users/yangjunjie/work/SimpleHartreeFock/data/h2o/0.5000/data.h5";
-    auto ene_rhf = solve_rhf(filename);
+    // auto ene_rhf = solve_rhf(filename);
     return 0;
 }

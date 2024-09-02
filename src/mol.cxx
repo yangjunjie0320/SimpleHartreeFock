@@ -3,7 +3,9 @@
 #include <armadillo>
 #include <string>
 #include <cstdio>
+#include <fstream> // Add this include for file checking
 
+// molecule information, T is the type of the data class
 class MoleculeInformation {
 public:
     int nelec_alph;
@@ -12,25 +14,31 @@ public:
 
     double ene_nuc, ene_rhf_ref, ene_uhf_ref;
 
-    arma::mat  s1e;
-    arma::mat  h1e;
+    arma::imat atm;
+    arma::imat env;
+    arma::mat bas;
+
+    arma::mat ovlap, hcore;
     arma::cube cderi;
 
-    arma::imat atm;
-    arma::mat  bas;
-    arma::imat env;
-
-    // arma::imat
     MoleculeInformation(std::string filename) {
-        arma::ivec nelec; nelec.load(arma::hdf5_name(filename, "nelec"));
-        nelec_alph = nelec(0);
-        nelec_beta = nelec(1);
+        // check if the hdf5 file exists
+        std::ifstream file(filename); // Check if the file can be opened
+        if (!file) {
+            std::cerr << "Error: HDF5 file " << filename << " does not exist." << std::endl;
+            throw std::runtime_error("HDF5 file does not exist");
+        }
+        file.close(); // Close the file after checking
 
-        s1e.load(arma::hdf5_name(filename, "ovlp"));
-        h1e.load(arma::hdf5_name(filename, "hcore"));
+        // load the molecule information from the hdf5 file
+        arma::ivec nelec; nelec.load(arma::hdf5_name(filename, "nelec"));
+        nelec_alph = nelec(0); nelec_beta = nelec(1);
+
+        ovlap.load(arma::hdf5_name(filename, "ovlp"));
+        hcore.load(arma::hdf5_name(filename, "hcore"));
         cderi.load(arma::hdf5_name(filename, "cderi"));
 
-        nao = s1e.n_rows;
+        nao = hcore.n_rows; // Corrected from s1e to hcore
         naux = cderi.n_slices;
 
         arma::vec ene_tmp; 
@@ -44,14 +52,14 @@ public:
     }
 };
 
-arma::mat MoleculeInformation::get_hcore() {
-    return this->h1e;
+arma::mat& get_ovlap(const MoleculeInformation& mol_obj) {
+    return mol_obj.ovlap;
 }
 
-arma::mat MoleculeInformation::get_ovlp() {
-    return this->s1e;
+arma::mat& get_hcore(const MoleculeInformation& mol_obj) {
+    return mol_obj.hcore;
 }
 
-arma::mat MoleculeInformation::get_cderi() {
-    return this->cderi;
+arma::cube& get_cderi(const MoleculeInformation& mol_obj) {
+    return mol_obj.cderi;
 }
